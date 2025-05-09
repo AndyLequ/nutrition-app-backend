@@ -1,0 +1,6 @@
+{
+  "watch": ["server.ts", "src"],
+  "ext": "ts,json",
+  "ignore": ["node_modules", "expo-router"],
+  "exec": "ts-node server.ts"
+}
