@@ -1,11 +1,25 @@
-import express, { Request, Response } from 'express';
+import express, { Request, Response, NextFunction } from 'express';
 import axios from 'axios';
 import dotenv from 'dotenv';
+import rateLimit from 'express-rate-limit';
+import cors from 'cors';
 
 dotenv.config();
 
 const app = express();
 const PORT = process.env.PORT || '3000';
+
+const limiter = rateLimit({
+  windowMs: 1 * 60 * 1000, // 1 minute
+  max: 100, // Limit each IP to 100 requests per windowMs
+  message: 'Too many requests, please try again later.'
+});
+
+const corsOptions = {
+  origin: process.env.CLIENT_URL || 'http://localhost:3000',
+  methods: ['GET'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
+}
 
 const spoonacular = axios.create({
   baseURL: 'https://api.spoonacular.com',
@@ -36,7 +50,9 @@ interface NutritionInfo {
 }
 
 // Middleware
+app.use(cors(corsOptions));
 app.use(express.json());
+app.use('/api', limiter);
 
 // Endpoints
 
@@ -136,6 +152,14 @@ app.get('/api/recipes/:id/nutrition', async (req: Request, res: Response) => {
     console.error(error);
     res.status(500).send('Error fetching recipe nutrition');
   }
+});
+
+app.use((err: Error, req: Request, res: Response, next: NextFunction) => {
+  console.error(err.stack);
+  res.status(500).json({
+    error: 'Internal Server Error',
+    message: process.env.NODE_ENV === 'production' ? undefined : err.message
+  });
 });
 
 app.listen(PORT,  () => {
