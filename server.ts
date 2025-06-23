@@ -16,7 +16,7 @@ const limiter = rateLimit({
 });
 
 const corsOptions = {
-  origin: process.env.CLIENT_URL || 'http://localhost:3000',
+  origin: '*', // Allow all origins
   methods: ['GET'],
   allowedHeaders: ['Content-Type', 'Authorization'],
 }
