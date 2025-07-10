@@ -233,7 +233,8 @@ app.get('/api/recipes/:id/nutrition', async (req: Request, res: Response) => {
   }
 });
 
-//new endpoints for fatsecret
+//** new endpoints for fatsecret BELOW **//
+
 app.get('/api/ingredients/search', async (req: Request, res: Response) => {
   try{
     const {query, max_results = '10', page = '0'} = req.query;
@@ -275,6 +276,17 @@ app.get('/api/ingredients/search', async (req: Request, res: Response) => {
   }
 })
 
+app.get('/api/ingredients/:id', async(req: Request, res: Response) => {
+  try{
+    const foodId = req.params.id;
+    const signedRequest = signRequest('POST', FATSECRET_URL, {
+      method: 'food.get',
+      food_id: foodId
+    })
+  } catch(error: any){
+    res.status(500).json({error: error.message})
+  }
+})
 
 app.use((err: Error, req: Request, res: Response, next: NextFunction) => {
   console.error(err.stack);
