@@ -71,7 +71,7 @@ interface NutritionInfo {
 interface FatSecretFood {
   food_id: string;
   food_name: string;
-  food_image?: string';
+  food_image?: string;
   servings: {
     serving: FatSecretServing | FatSecretServing[];
   };
@@ -232,6 +232,22 @@ app.get('/api/recipes/:id/nutrition', async (req: Request, res: Response) => {
     res.status(500).send('Error fetching recipe nutrition');
   }
 });
+
+//new endpoints for fatsecret
+app.get('/api/ingredients/search', async (req: Request, res: Response) => {
+  try{
+    const {query, max_results = '10', page = '0'} = req.query;
+    if(!query) return res.status(400).json({error: "Query parameter is required"})
+
+    const signedRequest = signRequest('POST', FATSECRET_URL, {
+      
+    })
+
+  } catch(error: any){
+    res.status(500).json({error: error.message})
+  }
+})
+
 
 app.use((err: Error, req: Request, res: Response, next: NextFunction) => {
   console.error(err.stack);
