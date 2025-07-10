@@ -240,9 +240,36 @@ app.get('/api/ingredients/search', async (req: Request, res: Response) => {
     if(!query) return res.status(400).json({error: "Query parameter is required"})
 
     const signedRequest = signRequest('POST', FATSECRET_URL, {
-      
-    })
+      method: 'foods.search',
+      search_expression: query as string,
+      max_results: parseInt(max_results as string),
+      page_number: parseInt(page as string)
+    });
 
+
+    const response = await axios.post(
+      signedRequest.url,
+      signedRequest.data,
+      {headers: signedRequest.headers}
+    )
+
+    //type-safe mapping to Ingredient[]
+    const foods = response.data?.foods?.food;
+    const ingredients: Ingredient[] = Array.isArray(foods)
+      ? foods.map((food: any) => ({
+        id: parseInt(food.food_id),
+        name: food.food_name,
+        image: food.food_image || ''
+      }))
+      : foods
+        ? [{
+          id: parseInt(foods.food_id),
+          name: foods.food_name,
+          image: foods.food_image || ''
+        }]
+        : [];
+
+      res.json(ingredients);
   } catch(error: any){
     res.status(500).json({error: error.message})
   }
