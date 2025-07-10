@@ -283,6 +283,45 @@ app.get('/api/ingredients/:id', async(req: Request, res: Response) => {
       method: 'food.get',
       food_id: foodId
     })
+
+    const response = await axios.post(
+      signedRequest.url,
+      signedRequest.data,
+      {headers: signedRequest.headers}
+    )
+
+    const food: FatSecretFood = response.data?.food;
+    if(!food) return res.status(404).json({error: "Food item not found"})
+
+    //Handle serving types
+    let serving: FatSecretServing | undefined;
+    if(Array.isArray(food.servings.serving)){
+      serving = food.servings.serving[0];
+
+    } else if(food.servings.serving){
+      serving = food.servings.serving
+    }
+
+    //Map to NutritionInfo
+    const nutrition: NutritionInfo | null = serving ? {
+      protein: parseFloat(serving.protein) || 0,
+      calories: parseFloat(serving.calories) || 0,
+      carbs: parseFloat(serving.carbohydrate) || 0,
+      fat: parseFloat(serving.fat) || 0,
+      amount: parseFloat(serving.metric_serving_amount) || 0,
+      unit: serving.metric_serving_unit || 'g'
+    } : null;
+
+    //create Recipe-compatible response
+    const result: Recipe = {
+      id: parseInt(food.food_id),
+      title: food.food_name,
+      image: food.food_image || '',
+      nutrition,
+      rawData: food
+    }
+
+    res.json(result)
   } catch(error: any){
     res.status(500).json({error: error.message})
   }
