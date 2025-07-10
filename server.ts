@@ -4,6 +4,10 @@ import dotenv from 'dotenv';
 import rateLimit from 'express-rate-limit';
 import cors from 'cors';
 
+//new code for fatsecret
+import OAuth from 'oauth-1.oa';
+import crypto from 'crypto'
+
 dotenv.config();
 
 const app = express();
@@ -25,6 +29,20 @@ const spoonacular = axios.create({
   baseURL: 'https://api.spoonacular.com',
   params: { apiKey: process.env.SPOONACULAR_API_KEY }
 });
+
+//FatSecret URL
+const FATSECRET_URL = 'https://platform.fatsecret.com/rest/server.api'
+
+// OAuth 1.0a configuration
+const oauth = OAuth({
+  consumer: {
+    key: process.env.FATSECRET_CONSUMER_KEY!,
+    secret: process.env.FATSECRET_CONSUMER_SECRET!,
+  },
+  signature_method: 'HMAC-SHA1',
+  hash_function: (baseString, key) =>
+    crypto.createHmac('sha1', key).update(baseString).digest('base64')
+})
 
 // Types
 interface Ingredient {
@@ -48,6 +66,67 @@ interface NutritionInfo {
   amount: number;
   unit: string;
 }
+
+//FatSecret API types
+interface FatSecretFood {
+  food_id: string;
+  food_name: string;
+  food_image?: string';
+  servings: {
+    serving: FatSecretServing | FatSecretServing[];
+  };
+}
+
+interface FatSecretRecipe {
+  recipe_id: string;
+  recipe_name: string;
+  recipe_image?: string;
+  recipe_url?: string;
+  recipe_description?: string;
+  ingredients?: {
+    ingredient: FatSecretIngredient | FatSecretIngredient[];
+  }
+  recipe_nutrition?: {
+    protein: string;
+    calories: string;
+    carbohydrate: string;
+    fat: string;
+  }
+  number_of_servings?: string;
+}
+
+interface FatSecretIngredient {
+  food_id?: string;
+  ingredient_name: string;
+  ingredient_description: string;
+}
+
+//helper function to sing requests
+const signRequest = (
+  method: 'POST' | 'GET',
+  url: string,
+  data: Record<string, string | number>
+
+) => {
+  const request = {
+    url, 
+    method, 
+    data: {...data,format: 'json'}
+  }
+
+
+const headers = oauth.toHeader(oauth.authorize(request));
+return {
+  url: request.url,
+  method: request.method,
+  data: request.data,
+  headers: {
+    ...headers,
+    'Content-Type': 'application/x-www-form-urlencoded'
+    }
+  }
+}
+
 
 // Middleware
 app.use(cors(corsOptions));
