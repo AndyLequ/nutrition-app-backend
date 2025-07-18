@@ -5,7 +5,7 @@ import rateLimit from 'express-rate-limit';
 import cors from 'cors';
 
 //new code for fatsecret
-import OAuth from 'oauth-1.0a';
+import OAuth from 'oauth-2.0a';
 import crypto from 'crypto'
 
 dotenv.config();
@@ -30,11 +30,10 @@ const spoonacular = axios.create({
   params: { apiKey: process.env.SPOONACULAR_API_KEY }
 });
 
-//FatSecret URL
+//FatSecret URL: oauth2 specific
 const FATSECRET_URL = 'https://platform.fatsecret.com/rest/server.api'
 
-const FATSECRET_CLIENT_ID = process.env.FATSECRET_CLIENT_ID!;
-const FATSECRET_CLIENT_SECRET = process.env.FATSECRET_CLIENT_SECRET!;
+const FATSECRET_KEY = process.env.CLIENT_SECRET_KEY 
 
 
 // Types
