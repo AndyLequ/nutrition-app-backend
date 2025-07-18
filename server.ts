@@ -32,8 +32,14 @@ const spoonacular = axios.create({
 
 //FatSecret URL: oauth2 specific
 const FATSECRET_URL = 'https://platform.fatsecret.com/rest/server.api'
-
 const FATSECRET_KEY = process.env.CLIENT_SECRET_KEY 
+
+const fatsecret = axios.create({
+  baseURL: 'https://platform.fatsecret.com/rest',
+  params: { apiKey: FATSECRET_KEY}
+
+})
+
 
 
 // Types
@@ -59,6 +65,13 @@ interface NutritionInfo {
   unit: string;
 }
 
+//FatSecret API types
+interface FatSecretFood {
+  id: number;
+  name: string;
+  image: string;
+}
+
 interface FatSecretServing {
   protein: string;
   calories: string;
@@ -66,16 +79,6 @@ interface FatSecretServing {
   fat: string;
   metric_serving_amount: string;
   metric_serving_unit: string;
-}
-
-//FatSecret API types
-interface FatSecretFood {
-  food_id: string;
-  food_name: string;
-  food_image?: string;
-  servings: {
-    serving: FatSecretServing | FatSecretServing[];
-  };
 }
 
 interface FatSecretRecipe {
@@ -115,8 +118,8 @@ const signRequest = (
     data: {...data,format: 'json'}
   }
 
-
-const headers = oauth.toHeader(oauth.authorize(request));
+// header stuff for fatsecret OAuth
+const headers = OAuth.toHeader(OAuth.authorize(request));
 return {
   url: request.url,
   method: request.method,
@@ -215,6 +218,21 @@ app.get('/api/recipes/:id/information', async (req: Request, res: Response) => {
     res.status(500).send('Error fetching recipe info');
   }
 });
+
+app.get('/api/foods/search/v1', async(req: Request, res: Response) => {
+  const {id} = req.params;
+  try {
+    const { data } = await fatsecret.get<{ results: FatSecretFood []}>('/foods/search/v1', {
+      params:{
+        query,
+        number: limit,
+      }
+    })>
+  } catch(error){
+    console.error(error)
+    res.status(500).send('Error fetching recipe info')
+  }
+}) 
 
 app.get('/api/recipes/:id/nutrition', async (req: Request, res: Response) => {
   const { id } = req.params;
