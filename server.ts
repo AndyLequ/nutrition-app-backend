@@ -5,7 +5,7 @@ import rateLimit from 'express-rate-limit';
 import cors from 'cors';
 
 //new code for fatsecret
-import OAuth from 'oauth-1.oa';
+import OAuth from 'oauth-1.0a';
 import crypto from 'crypto'
 
 dotenv.config();
@@ -33,16 +33,9 @@ const spoonacular = axios.create({
 //FatSecret URL
 const FATSECRET_URL = 'https://platform.fatsecret.com/rest/server.api'
 
-// OAuth 1.0a configuration
-const oauth = OAuth({
-  consumer: {
-    key: process.env.FATSECRET_CONSUMER_KEY!,
-    secret: process.env.FATSECRET_CONSUMER_SECRET!,
-  },
-  signature_method: 'HMAC-SHA1',
-  hash_function: (baseString, key) =>
-    crypto.createHmac('sha1', key).update(baseString).digest('base64')
-})
+const FATSECRET_CLIENT_ID = process.env.FATSECRET_CLIENT_ID!;
+const FATSECRET_CLIENT_SECRET = process.env.FATSECRET_CLIENT_SECRET!;
+
 
 // Types
 interface Ingredient {
@@ -65,6 +58,15 @@ interface NutritionInfo {
   fat: number;
   amount: number;
   unit: string;
+}
+
+interface FatSecretServing {
+  protein: string;
+  calories: string;
+  carbohydrate: string;
+  fat: string;
+  metric_serving_amount: string;
+  metric_serving_unit: string;
 }
 
 //FatSecret API types
@@ -326,6 +328,109 @@ app.get('/api/ingredients/:id', async(req: Request, res: Response) => {
     res.status(500).json({error: error.message})
   }
 })
+
+//recipe endpoints for fatsecret
+app.get('/api/recipes/search', async(req: Request, res: Response) => {
+  try {
+    const {query, max_results = '10', page = '0'} = req.query;
+    if(!query) return res.status(400).json({error: "Query parameter is required"})
+
+      const signedRequest = signRequest('POST', FATSECRET_URL,{
+        method: 'recipes.search',
+        search_expression: parseInt(max_results as string),
+        page_number: parseInt(page as string)
+      })
+
+      const response = await axios.post(
+        signedRequest.url,
+        signedRequest.data,
+        {headers: signedRequest.headers}
+      )
+
+      const recipesData = response.data?.recipes?.recipe;
+      const recipes: Recipe[] = Array.isArray(recipesData)
+        ? recipesData.map((recipe: any) => ({
+          id: parseInt(recipe.recipe_id),
+          title: recipe.recipe_name,
+          image: recipe.recipe_image || '',
+          url: recipe.recipe_url,
+          description: recipe.recipe_description || ''
+        }))
+        :recipesData
+          ? [{
+            id: parseInt(recipesData.recipe_id),
+            title: recipesData.recipe_name,
+            image: recipesData.recipe_image || '',
+            url: recipesData.recipe_url,
+            description: recipesData.recipe_description || ''
+          }]
+          : []
+
+          res.json(recipes);
+  } catch (error: any){
+    res.status(500).json({error: error.message})
+  }
+})
+
+app.get('/api/recipes/:id', async (req: Request, res: Response) => {
+  try{
+    const recipeId = req.params.id;
+    const signedRequest = signRequest('POST', FATSECRET_URL, {
+      method: 'recipe.get',
+      recipe_id: recipeId
+    })
+
+    const response = await axios.post(
+      signedRequest.url,
+      signedRequest.data,
+      { headers: signedRequest.headers}
+    )
+
+    const recipeData: FatSecretRecipe = response.data?.recipe;
+    if(!recipeData) return res.status(404).json({error: "Recipe not found"});
+
+    //process ingredients
+    let ingredients: Ingredient[] = [];
+    if(recipeData.ingredients?.ingredient){
+      const ingredientList = Array.isArray(recipeData.ingredients.ingredient)
+        ? recipeData.ingredients.ingredient
+        : [recipeData.ingredients.ingredient]
+
+        ingredients = ingredientList.map(ing => ({
+          id: ing.food_id ? parseInt(ing.food_id) : 0,
+          name: ing.ingredient_description || ing.ingredient_name,
+          image: ''
+        }))
+    }
+
+    const nutrition: NutritionInfo | null = recipeData.recipe_nutrition
+      ? {
+        protein: parseFloat(recipeData.recipe_nutrition.protein) || 0,
+        calories: parseFloat(recipeData.recipe_nutrition.calories) || 0,
+        carbs: parseFloat(recipeData.recipe_nutrition.carbohydrate) || 0,
+        fat: parseFloat(recipeData.recipe_nutrition.fat) || 0,
+        amount: 1,
+        unit: 'serving'
+      }
+      : null;
+
+    const recipe: Recipe = {
+      id: parseInt(recipeData.recipe_id),
+      title: recipeData.recipe_name,
+      image: recipeData.recipe_image || '',
+      ingredients,
+      nutrition,
+      servings: recipeData.number_of_servings || '',
+      rawData: recipeData
+    }
+
+    res.json(recipe);
+
+  } catch(error:any){
+    res.status(500).json({error: error.message})
+  }
+})
+
 
 app.use((err: Error, req: Request, res: Response, next: NextFunction) => {
   console.error(err.stack);
