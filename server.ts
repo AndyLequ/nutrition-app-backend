@@ -118,6 +118,37 @@ const signRequest = (
     data: {...data,format: 'json'}
   }
 
+let accessToken = null;
+let tokenExpiration = 0;
+
+//helper function to get access token
+async function getAccessToken() {
+  if(accessToken && Date.now() < tokenExpiration){
+    return accessToken
+  }
+
+  try{
+    const params = new URLSearchParams();
+    params.append('grant_type', 'client_credentials');
+    params.append('scope','basic');
+
+    const response = await axios.post(TOKEN_URL, params, {
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+        'Authorization': `Basic ${Buffer.from(`${CLIENT_ID}:${CLIENT_SECRET}`).toString('base64')}`
+      }
+    })
+
+    accessToken = response.data.access_token;
+    tokenExpiration = Date.now() = (response.data.expires_in * 1000) - 300000;
+
+    return accessToken;
+  } catch (error){
+    console.error('Token Error:', error.response?.data || error.message);
+    throw new Error('Failed to obtain access token')
+  }
+}
+
 // header stuff for fatsecret OAuth
 const headers = OAuth.toHeader(OAuth.authorize(request));
 return {
@@ -248,7 +279,7 @@ app.get('/api/search-foods', async(req, res) => {
 
     res.json(response.data)
 
-  } catch(error){
+  } catch(error: any){
     console.error('API Error:', error.response?.data || error.message)
 
     if(error.response?.status === 401){
@@ -256,7 +287,8 @@ app.get('/api/search-foods', async(req, res) => {
     }
 
     res.status(500).json({
-      error: 'Failed to fetch food data'
+      error: 'Failed to fetch food data',
+      details: error.response?.data || error.message
     })
 
   }
