@@ -219,20 +219,48 @@ app.get('/api/recipes/:id/information', async (req: Request, res: Response) => {
   }
 });
 
-app.get('/api/foods/search/v1', async(req: Request, res: Response) => {
-  const {id} = req.params;
+
+//fatsecret food search
+app.get('/api/search-foods', async(req, res) => {
   try {
-    const { data } = await fatsecret.get<{ results: FatSecretFood []}>('/foods/search/v1', {
-      params:{
-        query,
-        number: limit,
+    const {query, maxResults, pageNumber} = req.query;
+    if(!query) return res.status(400).json({error: 'Missing search query'});
+
+    //Get OAuth 2.0 access token
+    const token = await getAccessToken();
+
+    //API request parameters
+    const params = {
+      method: 'foods.search',
+      search_expression: query, 
+      format: 'json',
+      max_results: maxResults || 20,
+      page_number: pageNumber || 0
+    };
+
+    const response = await axios.get(API_URL, {
+      params,
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Accept': 'application/json'
       }
-    })>
+    })
+
+    res.json(response.data)
+
   } catch(error){
-    console.error(error)
-    res.status(500).send('Error fetching recipe info')
+    console.error('API Error:', error.response?.data || error.message)
+
+    if(error.response?.status === 401){
+      accessToken = null;
+    }
+
+    res.status(500).json({
+      error: 'Failed to fetch food data'
+    })
+
   }
-}) 
+})
 
 app.get('/api/recipes/:id/nutrition', async (req: Request, res: Response) => {
   const { id } = req.params;
