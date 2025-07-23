@@ -3,6 +3,16 @@ import axios from 'axios';
 import dotenv from 'dotenv';
 import rateLimit from 'express-rate-limit';
 import cors from 'cors';
+import {
+    Recipe,
+    Ingredient,
+    NutritionInfo,
+    FatSecretFood,
+    FatSecretServing,
+    FatSecretRecipe,
+    FatSecretIngredient
+} from './types'
+
 
 //new code for fatsecret
 import OAuth from 'oauth-2.0a';
@@ -25,6 +35,7 @@ const corsOptions = {
   allowedHeaders: ['Content-Type', 'Authorization'],
 }
 
+//spoonacular URL and params
 const spoonacular = axios.create({
   baseURL: 'https://api.spoonacular.com',
   params: { apiKey: process.env.SPOONACULAR_API_KEY }
@@ -34,132 +45,52 @@ const spoonacular = axios.create({
 const FATSECRET_URL = 'https://platform.fatsecret.com/rest/server.api'
 const FATSECRET_KEY = process.env.CLIENT_SECRET_KEY 
 
+//fatsecret secrets and token
+const TOKEN_URL = 'https://oauth.fatsecret.com/connect/token';
+const CLIENT_ID = process.env.FATSECRET_CLIENT_ID!;
+const CLIENT_SECRET = process.env.FATSECRET_CLIENT_SECRET!;
+
 const fatsecret = axios.create({
   baseURL: 'https://platform.fatsecret.com/rest',
   params: { apiKey: FATSECRET_KEY}
 
 })
 
+//creating helper function getFatSecretToken()
+let fatSecretAccessToken: string | null = null;
+let fatSecretTokenExpiresAt = 0;
 
+async function getFatSecretToken(): Promise<string>{
+  const now = Date.now();
 
-// Types
-interface Ingredient {
-  id: number;
-  name: string;
-  image: string;
-}
-
-interface Recipe {
-  id: number;
-  title: string;
-  image: string;
-  [key: string]: any;
-}
-
-interface NutritionInfo {
-  protein: number;
-  calories: number;
-  carbs: number;
-  fat: number;
-  amount: number;
-  unit: string;
-}
-
-//FatSecret API types
-interface FatSecretFood {
-  id: number;
-  name: string;
-  image: string;
-}
-
-interface FatSecretServing {
-  protein: string;
-  calories: string;
-  carbohydrate: string;
-  fat: string;
-  metric_serving_amount: string;
-  metric_serving_unit: string;
-}
-
-interface FatSecretRecipe {
-  recipe_id: string;
-  recipe_name: string;
-  recipe_image?: string;
-  recipe_url?: string;
-  recipe_description?: string;
-  ingredients?: {
-    ingredient: FatSecretIngredient | FatSecretIngredient[];
-  }
-  recipe_nutrition?: {
-    protein: string;
-    calories: string;
-    carbohydrate: string;
-    fat: string;
-  }
-  number_of_servings?: string;
-}
-
-interface FatSecretIngredient {
-  food_id?: string;
-  ingredient_name: string;
-  ingredient_description: string;
-}
-
-//helper function to sing requests
-const signRequest = (
-  method: 'POST' | 'GET',
-  url: string,
-  data: Record<string, string | number>
-
-) => {
-  const request = {
-    url, 
-    method, 
-    data: {...data,format: 'json'}
-  }
-
-let accessToken = null;
-let tokenExpiration = 0;
-
-//helper function to get access token
-async function getAccessToken() {
-  if(accessToken && Date.now() < tokenExpiration){
-    return accessToken
+  // return cached token if still valid
+  if(fatSecretAccessToken && now < fatSecretTokenExpiresAt) {
+    return fatSecretAccessToken;
   }
 
   try{
     const params = new URLSearchParams();
-    params.append('grant_type', 'client_credentials');
-    params.append('scope','basic');
+    params.append('grant_type', 'client_credentials')
+    params.append('scope', 'basic') 
+
+    const credentials = Buffer.from(`${CLIENT_ID}:${CLIENT_SECRET}`).toString('base64');
 
     const response = await axios.post(TOKEN_URL, params, {
       headers: {
         'Content-Type': 'application/x-www-form-urlencoded',
-        'Authorization': `Basic ${Buffer.from(`${CLIENT_ID}:${CLIENT_SECRET}`).toString('base64')}`
+        'Authorization': `Basic ${credentials}`,
       }
     })
 
-    accessToken = response.data.access_token;
-    tokenExpiration = Date.now() = (response.data.expires_in * 1000) - 300000;
+    fatSecretAccessToken = response.data.access_token;
+    fatSecretTokenExpiresAt = now + (response.data.expires_in * 1000) - 300_000; //refresh in 5 minutes
 
-    return accessToken;
-  } catch (error){
-    console.error('Token Error:', error.response?.data || error.message);
-    throw new Error('Failed to obtain access token')
+    return fatSecretAccessToken;
+  } catch(err: any){
+    console.error('Failed to fetch FatSecret access token:', err.response?.data || err.message);
+    throw new Error('Unable to authenticate with FatSecret')
   }
-}
 
-// header stuff for fatsecret OAuth
-const headers = OAuth.toHeader(OAuth.authorize(request));
-return {
-  url: request.url,
-  method: request.method,
-  data: request.data,
-  headers: {
-    ...headers,
-    'Content-Type': 'application/x-www-form-urlencoded'
-    }
-  }
 }
 
 
@@ -252,28 +183,29 @@ app.get('/api/recipes/:id/information', async (req: Request, res: Response) => {
 
 
 //fatsecret food search
-app.get('/api/search-foods', async(req, res) => {
+app.get('/api/fatsecret/search-foods', async(req: Request, res: Response) => {
   try {
     const {query, maxResults, pageNumber} = req.query;
     if(!query) return res.status(400).json({error: 'Missing search query'});
 
     //Get OAuth 2.0 access token
-    const token = await getAccessToken();
+    const token = await getFatSecretToken();
 
-    //API request parameters
-    const params = {
-      method: 'foods.search',
-      search_expression: query, 
-      format: 'json',
-      max_results: maxResults || 20,
-      page_number: pageNumber || 0
-    };
+    const params = new URLSearchParams();
+    params.append('method', 'foods.search')
+    params.append('search_expression', query as string)
+    params.append('format', 'json')
+    params.append('max_results', String(maxResults))
+    params.append('page_number', String(pageNumber))
 
-    const response = await axios.get(API_URL, {
+
+    const response = await axios.post(
+      'https://platform.fatsecret.com/rest/server.api',
       params,
+      {
       headers: {
         'Authorization': `Bearer ${token}`,
-        'Accept': 'application/json'
+        'Accept': 'application/x-www-form-urlencoded'
       }
     })
 
