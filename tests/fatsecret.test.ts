@@ -1,7 +1,7 @@
 import request from 'supertest'
-import app from '../server'
+import app from '../app'
 import axios from 'axios'
-import { getFatSecretToken } from '../server';
+import { getFatSecretToken } from '../fatsecret';
 
 jest.mock('axios', () => ({
     __esModule: true,
