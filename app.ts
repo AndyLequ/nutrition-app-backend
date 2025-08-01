@@ -1,62 +1,10 @@
-import express, { Request, Response, NextFunction } from 'express';
-import axios from 'axios';
-import dotenv from 'dotenv';
-import rateLimit from 'express-rate-limit';
-import cors from 'cors';
-import {
-    Recipe,
-    Ingredient,
-    NutritionInfo,
-    FatSecretFood,
-    FatSecretServing,
-    FatSecretRecipe,
-    FatSecretIngredient
-} from './types'
+import express, { Request, Response, NextFunction, ErrorRequestHandler } from 'express';
 
-import app from './app';
+import axios from 'axios'
 
-//new code for fatsecret
 
-dotenv.config();
+const app = express();
 
-const PORT = process.env.PORT || '3000';
-
-const limiter = rateLimit({
-  windowMs: 1 * 60 * 1000, // 1 minute
-  max: 100, // Limit each IP to 100 requests per windowMs
-  message: 'Too many requests, please try again later.'
-});
-
-const corsOptions = {
-  origin: '*', // Allow all origins
-  methods: ['GET'],
-  allowedHeaders: ['Content-Type', 'Authorization'],
-}
-
-//spoonacular URL and params
-const spoonacular = axios.create({
-  baseURL: 'https://api.spoonacular.com',
-  params: { apiKey: process.env.SPOONACULAR_API_KEY }
-});
-
-//FatSecret URL: oauth2 specific
-const FATSECRET_URL = 'https://platform.fatsecret.com/rest/server.api'
-const FATSECRET_KEY = process.env.CLIENT_SECRET_KEY 
-
-//fatsecret secrets and token
-const TOKEN_URL = 'https://oauth.fatsecret.com/connect/token';
-const CLIENT_ID = process.env.FATSECRET_CLIENT_ID!;
-const CLIENT_SECRET = process.env.FATSECRET_CLIENT_SECRET!;
-
-const fatsecret = axios.create({
-  baseURL: 'https://platform.fatsecret.com/rest',
-  params: { apiKey: FATSECRET_KEY}
-
-})
-
-//creating helper function getFatSecretToken()
-let fatSecretAccessToken: string | null = null;
-let fatSecretTokenExpiresAt = 0;
 
 async function getFatSecretToken(): Promise<string>{
   const now = Date.now();
@@ -92,10 +40,55 @@ async function getFatSecretToken(): Promise<string>{
 }
 
 
-// Middleware
-app.use(cors(corsOptions));
-app.use(express.json());
-app.use('/api', limiter);
+// define routes here
+//fatsecret food search
+app.get('/api/fatsecret/search-foods', async(req: Request, res: Response) => {
+  try {
+    const {query, maxResults, pageNumber} = req.query;
+    if(!query) return res.status(400).json({error: 'Missing search query'});
+
+    //Get OAuth 2.0 access token
+    const token = await getFatSecretToken();
+
+    const params = new URLSearchParams();
+    params.append('method', 'foods.search')
+    params.append('search_expression', query as string)
+    params.append('format', 'json')
+    params.append('max_results', String(maxResults))
+    params.append('page_number', String(pageNumber))
+
+
+    const response = await axios.post(
+      'https://platform.fatsecret.com/rest/server.api',
+      params,
+      {
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Accept': 'application/x-www-form-urlencoded'
+      }
+    })
+
+    res.json(response.data)
+
+  } catch(error: any){
+    console.error('API Error:', error.response?.data || error.message)
+
+    res.status(500).json({
+      error: 'Failed to fetch food data from fatsecret'
+    })
+
+  }
+})
+
+app.get('/api/test-fatsecret-token', async(req: Request, res: Response) => {
+  try {
+    const token = await getFatSecretToken();
+    res.json({token})
+  } catch(err:any){
+    res.status(500).json({error:err.message})
+  }
+})
+
 
 // Endpoints
 
@@ -256,11 +249,5 @@ app.use((err: Error, req: Request, res: Response, next: NextFunction) => {
   });
 });
 
+
 export default app;
-
-if(process.env.NODE_ENV !== 'test'){
-  app.listen(PORT,  () => {
-    console.log(`Server is running on http://0.0.0.0:${PORT}`);
-  });
-
-}
