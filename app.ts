@@ -2,9 +2,48 @@ import express, { Request, Response, NextFunction, ErrorRequestHandler } from 'e
 
 import axios from 'axios'
 
+dotenv.config(); 
+
+import dotenv from 'dotenv';
 
 const app = express();
 
+//creating helper function getFatSecretToken()
+let fatSecretAccessToken: string | null = null;
+let fatSecretTokenExpiresAt = 0;
+
+async function getFatSecretToken(): Promise<string>{
+  const now = Date.now();
+
+  // return cached token if still valid
+  if(fatSecretAccessToken && now < fatSecretTokenExpiresAt) {
+    return fatSecretAccessToken;
+  }
+
+  try{
+    const params = new URLSearchParams();
+    params.append('grant_type', 'client_credentials')
+    params.append('scope', 'basic') 
+
+    const credentials = Buffer.from(`${CLIENT_ID}:${CLIENT_SECRET}`).toString('base64');
+
+    const response = await axios.post(TOKEN_URL, params, {
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+        'Authorization': `Basic ${credentials}`,
+      }
+    })
+
+    fatSecretAccessToken = response.data.access_token;
+    fatSecretTokenExpiresAt = now + (response.data.expires_in * 1000) - 300_000; //refresh in 5 minutes
+
+    return fatSecretAccessToken!;
+  } catch(err: any){
+    console.error('Failed to fetch FatSecret access token:', err.response?.data || err.message);
+    throw new Error('Unable to authenticate with FatSecret')
+  }
+
+}
 
 async function getFatSecretToken(): Promise<string>{
   const now = Date.now();
