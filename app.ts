@@ -5,8 +5,23 @@ import {getFatSecretToken} from './fatsecret';
 dotenv.config(); 
 
 import dotenv from 'dotenv';
-
+import cors from 'cors';
+import rateLimit from 'express-rate-limit'
 const app = express();
+
+// Middleware
+app.use(cors({
+  origin: '*',
+  methods: ['GET'],
+  allowedHeaders:['Content-Type', 'Authorization'],
+}));
+app.use(express.json());
+app.use('/api', rateLimit({
+  windowMs: 1 * 60 * 1000,
+  max: 100,
+  message: 'Too many requests, please try again later.'
+}));
+
 
 
 
