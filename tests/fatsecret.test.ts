@@ -1,7 +1,9 @@
 import request from 'supertest'
 import app from '../app'
 import axios from 'axios'
-import { getFatSecretToken } from '../fatsecret';
+import * as fatSecretModule from '../fatsecret';
+
+jest.mock('../fatsecret') 
 
 jest.mock('axios', () => ({
     __esModule: true,
@@ -15,13 +17,8 @@ jest.mock('axios', () => ({
 }));
 
 const mockedAxios = axios as jest.Mocked<typeof axios>;
-const mockedGetToken = getFatSecretToken as jest.Mock;
+const mockedGetToken = fatSecretModule.getFatSecretToken as jest.Mock;
 
-//Mock token function
-jest.mock('../server', () => ({
-    ...jest.requireActual('../server'),
-    getFatSecretToken: jest.fn(),
-}));
 
 describe('FatSecret /api/fatsecret/search-foods Endpoint', () => {
     const mockedToken = 'mocked-access-token'

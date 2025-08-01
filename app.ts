@@ -10,9 +10,9 @@ import {
 } from './types'
 import axios from 'axios'
 import {getFatSecretToken} from './fatsecret';
-dotenv.config(); 
 
 import dotenv from 'dotenv';
+dotenv.config(); 
 import cors from 'cors';
 import rateLimit from 'express-rate-limit'
 const app = express();
@@ -52,8 +52,8 @@ app.get('/api/fatsecret/search-foods', async(req: Request, res: Response) => {
     params.append('method', 'foods.search')
     params.append('search_expression', query as string)
     params.append('format', 'json')
-    params.append('max_results', String(maxResults))
-    params.append('page_number', String(pageNumber))
+    params.append('max_results', String(maxResults ?? 'null'))
+    params.append('page_number', String(pageNumber ?? 'null'))
 
 
     const response = await axios.post(

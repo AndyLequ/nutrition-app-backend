@@ -1,7 +1,7 @@
 import axios from 'axios';
 import dotenv from 'dotenv';
-
 dotenv.config();
+
 
 const TOKEN_URL = 'https://oauth.fatsecret.com/connect/token';
 const CLIENT_ID = process.env.FATSECRET_CLIENT_ID!;
@@ -10,11 +10,16 @@ const CLIENT_SECRET = process.env.FATSECRET_CLIENT_SECRET!;
 let fatSecretAccessToken: string | null = null;
 let fatSecretTokenExpiresAt = 0;
 
+interface FatSecretTokenResponse {
+    access_token: string;
+    expires_in: number;
+}
+
 export async function getFatSecretToken(): Promise<string> {
   const now = Date.now();
 
   if (fatSecretAccessToken && now < fatSecretTokenExpiresAt) {
-    return fatSecretAccessToken!;
+    return fatSecretAccessToken;
   }
 
   try {
@@ -24,7 +29,7 @@ export async function getFatSecretToken(): Promise<string> {
 
     const credentials = Buffer.from(`${CLIENT_ID}:${CLIENT_SECRET}`).toString('base64');
 
-    const response = await axios.post(TOKEN_URL, params, {
+    const response = await axios.post<FatSecretTokenResponse>(TOKEN_URL, params, {
       headers: {
         'Content-Type': 'application/x-www-form-urlencoded',
         'Authorization': `Basic ${credentials}`,
@@ -32,6 +37,8 @@ export async function getFatSecretToken(): Promise<string> {
     });
 
     fatSecretAccessToken = response.data.access_token;
+
+    // Update cache with new token
     fatSecretTokenExpiresAt = now + (response.data.expires_in * 1000) - 300000;
     return fatSecretAccessToken;
   } catch (err: any) {
