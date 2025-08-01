@@ -14,7 +14,7 @@ export async function getFatSecretToken(): Promise<string> {
   const now = Date.now();
 
   if (fatSecretAccessToken && now < fatSecretTokenExpiresAt) {
-    return fatSecretAccessToken;
+    return fatSecretAccessToken!;
   }
 
   try {

@@ -1,5 +1,13 @@
 import express, { Request, Response, NextFunction, ErrorRequestHandler } from 'express';
-
+import {
+    Recipe,
+    Ingredient,
+    NutritionInfo,
+    FatSecretFood,
+    FatSecretServing,
+    FatSecretRecipe,
+    FatSecretIngredient
+} from './types'
 import axios from 'axios'
 import {getFatSecretToken} from './fatsecret';
 dotenv.config(); 
@@ -23,7 +31,11 @@ app.use('/api', rateLimit({
 }));
 
 
-
+//spoonacular URL and params
+const spoonacular = axios.create({
+  baseURL: 'https://api.spoonacular.com',
+  params: { apiKey: process.env.SPOONACULAR_API_KEY }
+});
 
 
 // define routes here
