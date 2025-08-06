@@ -77,6 +77,56 @@ app.get('/api/fatsecret/search-foods', async(req: Request, res: Response) => {
   }
 })
 
+// recipe search
+app.get('/api/fatsecret/recipes', async(req: Request, res: Response) => {
+  const {query, maxResults = 3, pageNumber = 0 } = req.query;
+  
+  try{
+    const token = await getFatSecretToken();
+    
+    const params = new URLSearchParams({
+      search_expressions: query as string,
+      format: 'json',
+      max_results: maxResults.toString(),
+      page_number: pageNumber.toString()
+    });
+    
+    const response = await axios.get('https://platform.fatsecret.com/rest/recipes/search/v3', {
+      params,
+      headers: {
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'application/x-www-form-urlencoded',
+      }
+    })
+      
+      const recipes = response.data.recipes.recipe;
+
+      const mappedRecipes: FatSecretRecipe[] = recipes.map((recipe: any) => ({
+        recipe_id: Number(recipe.recipe_id),
+        recipe_name: recipe.recipe_name,
+        recipe_nutrition: {
+          calories: Number(recipe.recipe_nutrition?.calories),
+          protein: Number(recipe.recipe_nutrition?.protein),
+          carbs: Number(recipe.recipe_nutrition?.carbohydrate),
+          fat: Number(recipe.recipe_nutrition?.fat),
+          amount: 1,
+          unit: "serving"
+
+        },
+        types: recipe.recipe_types?.recipe_type || []
+      }))
+      
+      res.json(mappedRecipes)
+      
+    } catch (error: any){
+      console.error(error.response?.data || error.message);
+      res.status(500).json({error: 'Failed to fetch FatSecret recipes'})
+    }
+  })
+  
+  
+  
+  
 app.get('/api/test-fatsecret-token', async(req: Request, res: Response) => {
   try {
     const token = await getFatSecretToken();
@@ -85,7 +135,6 @@ app.get('/api/test-fatsecret-token', async(req: Request, res: Response) => {
     res.status(500).json({error:err.message})
   }
 })
-
 
 // Spoonacular Endpoints
 

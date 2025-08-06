@@ -73,6 +73,8 @@ interface FatSecretRecipe {
   number_of_servings?: string;
 }
 
+interface FatSecretRecipeResults
+
 interface FatSecretIngredient {
   food_id?: string;
   ingredient_name: string;
