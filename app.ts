@@ -30,7 +30,6 @@ app.use('/api', rateLimit({
   message: 'Too many requests, please try again later.'
 }));
 
-
 //spoonacular URL and params
 const spoonacular = axios.create({
   baseURL: 'https://api.spoonacular.com',
@@ -88,7 +87,7 @@ app.get('/api/test-fatsecret-token', async(req: Request, res: Response) => {
 })
 
 
-// Endpoints
+// Spoonacular Endpoints
 
 //test
 app.get("/recipes", (_req, res) => {
@@ -188,56 +187,6 @@ app.get('/api/recipes/:id/nutrition', async (req: Request, res: Response) => {
     res.status(500).send('Error fetching recipe nutrition');
   }
 });
-
-// //fatsecret food search
-// app.get('/api/fatsecret/search-foods', async(req: Request, res: Response) => {
-//   try {
-//     const {query, maxResults, pageNumber} = req.query;
-//     if(!query) return res.status(400).json({error: 'Missing search query'});
-
-//     //Get OAuth 2.0 access token
-//     const token = await getFatSecretToken();
-
-//     const params = new URLSearchParams();
-//     params.append('method', 'foods.search')
-//     params.append('search_expression', query as string)
-//     params.append('format', 'json')
-//     params.append('max_results', String(maxResults))
-//     params.append('page_number', String(pageNumber))
-
-
-//     const response = await axios.post(
-//       'https://platform.fatsecret.com/rest/server.api',
-//       params,
-//       {
-//       headers: {
-//         'Authorization': `Bearer ${token}`,
-//         'Accept': 'application/x-www-form-urlencoded'
-//       }
-//     })
-
-//     res.json(response.data)
-
-//   } catch(error: any){
-//     console.error('API Error:', error.response?.data || error.message)
-
-//     res.status(500).json({
-//       error: 'Failed to fetch food data from fatsecret'
-//     })
-
-//   }
-// })
-
-//testing token retrieval
-// app.get('/api/test-fatsecret-token', async(req: Request, res: Response) => {
-//   try {
-//     const token = await getFatSecretToken();
-//     res.json({token})
-//   } catch(err:any){
-//     res.status(500).json({error:err.message})
-//   }
-// })
-
 
 app.use((err: Error, req: Request, res: Response, next: NextFunction) => {
   console.error(err.stack);
