@@ -77,7 +77,34 @@ app.get('/api/fatsecret/search-foods', async(req: Request, res: Response) => {
   }
 })
 
-// recipe search
+// get food by id fatsecret
+app.get('/api/fatsecret/food/:id', async(req: Request, res: Response) => {
+  const {query, maxResults = 3, pageNumber = 0 } = req.query;
+
+  try {
+    const token = await getFatSecretToken();
+
+    const params = new URLSearchParams({
+      
+    })
+
+    const response = await axios.get('https://platform.fatsecret.com/rest/food/v4', {
+      params,
+      headers: {
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'application/x-www-form-urlencoded'
+      }
+    })
+
+    
+
+
+  } catch(error: any){
+
+  }
+})
+
+// recipe search fatsecret
 app.get('/api/fatsecret/recipes', async(req: Request, res: Response) => {
   const {query, maxResults = 3, pageNumber = 0 } = req.query;
   
