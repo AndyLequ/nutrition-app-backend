@@ -37,7 +37,9 @@ const spoonacular = axios.create({
 });
 
 
-// define routes here
+// defining routes here
+// first section is fatsecret, then next section is spoonacular
+
 //fatsecret food search
 app.get('/api/fatsecret/search-foods', async(req: Request, res: Response) => {
   try {
@@ -79,28 +81,33 @@ app.get('/api/fatsecret/search-foods', async(req: Request, res: Response) => {
 
 // get food by id fatsecret
 app.get('/api/fatsecret/food/:id', async(req: Request, res: Response) => {
-  const {query, maxResults = 3, pageNumber = 0 } = req.query;
+  const foodId = req.params.id;
 
   try {
     const token = await getFatSecretToken();
 
-    const params = new URLSearchParams({
-      
-    })
-
     const response = await axios.get('https://platform.fatsecret.com/rest/food/v4', {
-      params,
+      params:{
+        method: 'food.get',
+        food_id: foodId,
+        format: 'json'
+      },
       headers: {
         Authorization: `Bearer ${token}`,
-        'Content-Type': 'application/x-www-form-urlencoded'
+        'Content-Type':'application/x-www-form-urlencoded'
       }
     })
 
-    
+    const nutritionInfo = mapFoodToNutritionInfo(response.data)
+    res.json(nutritionInfo)
 
 
   } catch(error: any){
-
+    console.error('api error:', error.response?.data || error.message);
+    res.status(500).json({
+      error:'Failed to fetch food data',
+      details: error.response?.data || error.message  
+    })
   }
 })
 
@@ -153,18 +160,48 @@ app.get('/api/fatsecret/recipes', async(req: Request, res: Response) => {
   
   
   
+  app.get('/api/fatsecret/recipe/:id', async(req: Request, res: Response) => {
+    try {
+      const recipeId = req.params.id;
+      
+      const token = await getFatSecretToken();
+      
+      const response = await axios.get('https://platform.fatsecret.com/rest/recipe/v2', {
+      params: {
+        method: 'recipe.get',
+        recipe_id: recipeId,
+        format: 'json'
+      }, 
+      headers: {
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'application/x-www-form-urlencoded',
+      }
+    })
+
+    console.log('FatSecret recipe response:', JSON.stringify(response.data, null, 2));
+
+    const nutritionInfo = mapRecipeToNutritionInfo(response.data);
+    res.json(nutritionInfo);
+
+    } catch (error: any) {
+      console.error('api error:', error.response?.data || error.message);
+      res.status(500).json({})
+    }
+  })
   
-app.get('/api/test-fatsecret-token', async(req: Request, res: Response) => {
-  try {
-    const token = await getFatSecretToken();
-    res.json({token})
-  } catch(err:any){
-    res.status(500).json({error:err.message})
-  }
-})
+  app.get('/api/test-fatsecret-token', async(req: Request, res: Response) => {
+    try {
+      const token = await getFatSecretToken();
+      res.json({token})
+    } catch(err:any){
+      res.status(500).json({error:err.message})
+    }
+  })
 
-// Spoonacular Endpoints
 
+// 
+// Spoonacular Endpoints //
+// 
 //test
 app.get("/recipes", (_req, res) => {
   res.json({ message: "Hello from the server!" });
@@ -173,7 +210,6 @@ app.get("/recipes", (_req, res) => {
 
 app.get('/api/ingredients', async (req: Request, res: Response) => {
   const { query, limit = '3', sort = 'calories', sortDirection = 'desc' } = req.query;
-
 
   try {
     const { data } = await spoonacular.get<{ results: Ingredient[] }>('/food/ingredients/search', {
@@ -263,6 +299,60 @@ app.get('/api/recipes/:id/nutrition', async (req: Request, res: Response) => {
     res.status(500).send('Error fetching recipe nutrition');
   }
 });
+
+// helper function to map API response to NutritionInfo
+// used for fatsecret endpoints
+
+// this one here is for food items returned from fatsecret
+function mapFoodToNutritionInfo(apiData: any): NutritionInfo {
+  const food = apiData?.food || {}
+  const servings = food?.servings?.serving || [];
+
+  const servingsArray = Array.isArray(servings) ? servings : [servings];
+
+  if(servingsArray.length === 0){
+    throw new Error('No serving information found');
+  }
+
+  const preferredServing = servingsArray.find(serving => 
+    serving.metric_serving_amount === '100.000'
+  ) || servingsArray[0]
+
+  // Extract and convert nutrition values
+  return{
+    protein: parseFloat(preferredServing.protein) || 0,
+    calories: parseFloat(preferredServing.calories) || 0,
+    carbs: parseFloat(preferredServing.carbohydrate) || 0,
+    fat: parseFloat(preferredServing.fat) || 0,
+    amount: parseFloat(preferredServing.metric_serving_amount) || 0,
+    unit: preferredServing.metric_serving_amount || 'g'
+  }
+}
+
+// this one is to map returned recipe data to nutrition info
+function mapRecipeToNutritionInfo(apiData: any): NutritionInfo {
+  const recipe = apiData?.recipe;
+
+  if(!recipe){
+    throw new Error('Missing recipe data')
+  }
+
+  const serving = recipe.serving_sizes?.serving;
+
+  if(!serving){
+    throw new Error('Missing serving data')
+  }
+
+  // Extract and convert nutrition values
+  return{
+    protein: parseFloat(serving.protein) || 0,
+    calories: parseFloat(serving.calories) || 0,
+    carbs: parseFloat(serving.carbohydrate) || 0,
+    fat: parseFloat(serving.fat) || 0,
+    amount: parseFloat(recipe.grams_per_portion) || 0,
+    unit: 'g'
+  }
+}
 
 app.use((err: Error, req: Request, res: Response, next: NextFunction) => {
   console.error(err.stack);
