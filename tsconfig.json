@@ -1,5 +1,6 @@
 {
   "compilerOptions": {
+    "types": ["jest", "node"],
     "target": "ES6",
     "module": "commonjs",
     "esModuleInterop": true,
@@ -7,5 +8,5 @@
     "strict": true,
     "skipLibCheck": true
   },
-  "include": ["server.ts", "src/**/*"]
+  "include": ["server.ts", "src/**/*", "tests/**/*.ts"]
 }
