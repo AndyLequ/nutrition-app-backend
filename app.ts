@@ -207,37 +207,18 @@ app.get('/api/fatsecret/recipes', async(req: Request, res: Response) => {
       }
 
       /* Get nutrition data (replaces /nutrition)  */
-      const baseNutrition = mapRecipeToNutritionInfo(response.data)
+      const nutritionPerServing = mapRecipeToNutritionInfo(response.data)
 
-      // safeguard against division by zero
-      const baseAmount = baseNutrition.amount > 0 ? baseNutrition.amount : 1;
-
-      // Calculate nutrition per gram from helper function resultsbaseAmount
-      const baseGrams = baseNutrition.amount // amount in grams (e.g. 100 for 100g serving)
-      const nutritionPerGram = {
-        protein: baseNutrition.protein / baseAmount,
-        calories: baseNutrition.calories / baseAmount,
-        carbs: baseNutrition.carbs / baseAmount,
-        fat: baseNutrition.fat / baseAmount
-      }
-
-      // Calculate nutrition per serving
-      const nutritionPerServing = {
-        protein: nutritionPerGram.protein * servingSizeGrams,
-        calories: nutritionPerGram.calories * servingSizeGrams,
-        carbs: nutritionPerGram.carbs * servingSizeGrams,
-        fat: nutritionPerGram.fat * servingSizeGrams
-
-      }
 
       // Combine the responses
       const result = {
         // from information endpoint
         servings,
         servingSizeGrams,
-
-        // from nutritionPerServing,
-        ...nutritionPerServing,
+        protein: nutritionPerServing.protein,
+        calories: nutritionPerServing.calories,
+        carbs: nutritionPerServing.carbs,
+        fat: nutritionPerServing.fat,
         amount:1,
         unit: "serving"
       }
