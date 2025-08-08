@@ -39,6 +39,14 @@ const spoonacular = axios.create({
 
 // defining routes here
 // first section is fatsecret, then next section is spoonacular
+app.get('/api/test-fatsecret-token', async(req: Request, res: Response) => {
+  try {
+    const token = await getFatSecretToken();
+    res.json({token})
+  } catch(err:any){
+    res.status(500).json({error:err.message})
+  }
+})
 
 //fatsecret food search
 app.get('/api/fatsecret/search-foods', async(req: Request, res: Response) => {
@@ -48,15 +56,15 @@ app.get('/api/fatsecret/search-foods', async(req: Request, res: Response) => {
 
     //Get OAuth 2.0 access token
     const token = await getFatSecretToken();
-
+    
     const params = new URLSearchParams();
     params.append('method', 'foods.search')
     params.append('search_expression', query as string)
     params.append('format', 'json')
     params.append('max_results', String(maxResults ?? 'null'))
     params.append('page_number', String(pageNumber ?? 'null'))
-
-
+    
+    
     const response = await axios.post(
       'https://platform.fatsecret.com/rest/server.api',
       params,
@@ -75,7 +83,7 @@ app.get('/api/fatsecret/search-foods', async(req: Request, res: Response) => {
     res.status(500).json({
       error: 'Failed to fetch food data from fatsecret'
     })
-
+    
   }
 })
 
@@ -135,6 +143,7 @@ app.get('/api/fatsecret/recipes', async(req: Request, res: Response) => {
       
       const recipes = response.data.recipes.recipe;
 
+      // deal with this later, need to figure out if I want to map the data here or just let it return only the results names
       const mappedRecipes: FatSecretRecipe[] = recipes.map((recipe: any) => ({
         recipe_id: Number(recipe.recipe_id),
         recipe_name: recipe.recipe_name,
@@ -158,12 +167,9 @@ app.get('/api/fatsecret/recipes', async(req: Request, res: Response) => {
     }
   })
   
-  
-  
   app.get('/api/fatsecret/recipe/:id', async(req: Request, res: Response) => {
     try {
       const recipeId = req.params.id;
-      
       const token = await getFatSecretToken();
       
       const response = await axios.get('https://platform.fatsecret.com/rest/recipe/v2', {
@@ -178,27 +184,152 @@ app.get('/api/fatsecret/recipes', async(req: Request, res: Response) => {
       }
     })
 
-    console.log('FatSecret recipe response:', JSON.stringify(response.data, null, 2));
+      // initializing recipe so that i can make my macronutrient per gram work below
+      const recipe = response.data?.recipe;
+      if(!recipe){
+        throw new Error('Recipe data not found in API response')
+      }
 
-    const nutritionInfo = mapRecipeToNutritionInfo(response.data);
-    res.json(nutritionInfo);
+      /* Replacing the recipe /information endpoint here 
+        Calculate nutrients per gram:
+          *Find the number of servings
+          *Find the metric serving amount
+          *Find the nutrients per serving
+          *Find the total grams of the recipe
+      */
+      const servings = parseInt(recipe.number_of_servings) || 1;
+      
+      // Fallback if total_weight_grams is missing
+      let servingSizeGrams = 100; //default fallback value
+      if(recipe.total_recipe_weights?.total_weight_grams){
+        const totalGrams = parseFloat(recipe.total_recipe_weights.total_weight_grams);
+        servingSizeGrams = totalGrams / servings;
+      }
+
+      /* Get nutrition data (replaces /nutrition)  */
+      const baseNutrition = mapRecipeToNutritionInfo(response.data)
+
+      // safeguard against division by zero
+      const baseAmount = baseNutrition.amount > 0 ? baseNutrition.amount : 1;
+
+      // Calculate nutrition per gram from helper function resultsbaseAmount
+      const baseGrams = baseNutrition.amount // amount in grams (e.g. 100 for 100g serving)
+      const nutritionPerGram = {
+        protein: baseNutrition.protein / baseAmount,
+        calories: baseNutrition.calories / baseAmount,
+        carbs: baseNutrition.carbs / baseAmount,
+        fat: baseNutrition.fat / baseAmount
+      }
+
+      // Calculate nutrition per serving
+      const nutritionPerServing = {
+        protein: nutritionPerGram.protein * servingSizeGrams,
+        calories: nutritionPerGram.calories * servingSizeGrams,
+        carbs: nutritionPerGram.carbs * servingSizeGrams,
+        fat: nutritionPerGram.fat * servingSizeGrams
+
+      }
+
+      // Combine the responses
+      const result = {
+        // from information endpoint
+        servings,
+        servingSizeGrams,
+
+        // from nutritionPerServing,
+        ...nutritionPerServing,
+        amount:1,
+        unit: "serving"
+      }
+
+      res.json(result)
 
     } catch (error: any) {
       console.error('api error:', error.response?.data || error.message);
-      res.status(500).json({})
+      res.status(500).json({
+        error: error.message,
+        details: error.response?.data || null
+      })
     }
   })
   
-  app.get('/api/test-fatsecret-token', async(req: Request, res: Response) => {
-    try {
-      const token = await getFatSecretToken();
-      res.json({token})
-    } catch(err:any){
-      res.status(500).json({error:err.message})
+
+  // helper function to map API response to NutritionInfo
+  // used for fatsecret endpoints
+  
+  // this one here is for food items returned from fatsecret
+  function mapFoodToNutritionInfo(apiData: any): NutritionInfo {
+    const food = apiData?.food || {}
+    const servings = food?.servings?.serving || [];
+  
+    const servingsArray = Array.isArray(servings) ? servings : [servings];
+  
+    if(servingsArray.length === 0){
+      throw new Error('No serving information found');
     }
-  })
+  
+    const preferredServing = servingsArray.find(serving => 
+      serving.metric_serving_amount === '100.000'
+    ) || servingsArray[0]
+  
+    // Extract and convert nutrition values
+    return{
+      protein: parseFloat(preferredServing.protein) || 0,
+      calories: parseFloat(preferredServing.calories) || 0,
+      carbs: parseFloat(preferredServing.carbohydrate) || 0,
+      fat: parseFloat(preferredServing.fat) || 0,
+      amount: parseFloat(preferredServing.metric_serving_amount) || 0,
+      unit: preferredServing.metric_serving_amount || 'g'
+    }
+  }
+  
+  // this one is to map returned recipe data to nutrition info
+  function mapRecipeToNutritionInfo(apiData: any): NutritionInfo {
+    const recipe = apiData?.recipe;
+  
+    if(!recipe){
+      throw new Error('Missing recipe data')
+    }
+    
+    // handle different serving formats (array vs single object)
+    let servings = recipe.serving_sizes?.serving;
+    if(servings && !Array.isArray(servings)){
+      servings = [servings]
+    }
 
+    // find any gram-based serving
+    const gramServing = servings?.find(
+      (s: any) => s.metric_serving_unit === 'g'
+    );
+    
+    if(gramServing){
+        // Extract and convert nutrition values
+        return{
+        protein: parseFloat(gramServing.protein) || 0,
+        calories: parseFloat(gramServing.calories) || 0,
+        carbs: parseFloat(gramServing.carbohydrate) || 0,
+        fat: parseFloat(gramServing.fat) || 0,
+        amount: parseFloat(gramServing.metric_serving_amount) || 0,
+        unit: 'g'
+      }
+    }
 
+    // fallback to first available serving
+    const firstServing = servings?.[0];
+    if(!firstServing) throw new Error('No serving data found')
+
+    return{
+        protein: parseFloat(firstServing.protein) || 0,
+        calories: parseFloat(firstServing.calories) || 0,
+        carbs: parseFloat(firstServing.carbohydrate) || 0,
+        fat: parseFloat(firstServing.fat) || 0,
+        amount: parseFloat(firstServing.metric_serving_amount) || 0,
+        unit: firstServing.metric_serving_unit || 'serving'
+      }
+  
+  }
+
+  
 // 
 // Spoonacular Endpoints //
 // 
@@ -300,59 +431,6 @@ app.get('/api/recipes/:id/nutrition', async (req: Request, res: Response) => {
   }
 });
 
-// helper function to map API response to NutritionInfo
-// used for fatsecret endpoints
-
-// this one here is for food items returned from fatsecret
-function mapFoodToNutritionInfo(apiData: any): NutritionInfo {
-  const food = apiData?.food || {}
-  const servings = food?.servings?.serving || [];
-
-  const servingsArray = Array.isArray(servings) ? servings : [servings];
-
-  if(servingsArray.length === 0){
-    throw new Error('No serving information found');
-  }
-
-  const preferredServing = servingsArray.find(serving => 
-    serving.metric_serving_amount === '100.000'
-  ) || servingsArray[0]
-
-  // Extract and convert nutrition values
-  return{
-    protein: parseFloat(preferredServing.protein) || 0,
-    calories: parseFloat(preferredServing.calories) || 0,
-    carbs: parseFloat(preferredServing.carbohydrate) || 0,
-    fat: parseFloat(preferredServing.fat) || 0,
-    amount: parseFloat(preferredServing.metric_serving_amount) || 0,
-    unit: preferredServing.metric_serving_amount || 'g'
-  }
-}
-
-// this one is to map returned recipe data to nutrition info
-function mapRecipeToNutritionInfo(apiData: any): NutritionInfo {
-  const recipe = apiData?.recipe;
-
-  if(!recipe){
-    throw new Error('Missing recipe data')
-  }
-
-  const serving = recipe.serving_sizes?.serving;
-
-  if(!serving){
-    throw new Error('Missing serving data')
-  }
-
-  // Extract and convert nutrition values
-  return{
-    protein: parseFloat(serving.protein) || 0,
-    calories: parseFloat(serving.calories) || 0,
-    carbs: parseFloat(serving.carbohydrate) || 0,
-    fat: parseFloat(serving.fat) || 0,
-    amount: parseFloat(recipe.grams_per_portion) || 0,
-    unit: 'g'
-  }
-}
 
 app.use((err: Error, req: Request, res: Response, next: NextFunction) => {
   console.error(err.stack);
