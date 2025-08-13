@@ -40,10 +40,18 @@ interface Recipe {
 }
 
 //FatSecret API types
+interface FatSecretSearchResponse {
+  foods: {
+    food: FatSecretFood | FatSecretFood[];
+    max_results: number;
+    page_number: number;
+    total_results: number;
+  }
+}
+
 interface FatSecretFood {
   id: number;
   name: string;
-  image: string;
 }
 
 interface FatSecretServing {
@@ -88,6 +96,7 @@ export {
     NutritionInfo,
     IngredientSearchParams,
     RecipeSearchParams,
+    FatSecretSearchResponse,
     FatSecretFood,
     FatSecretServing,
     FatSecretRecipe,
