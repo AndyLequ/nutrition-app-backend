@@ -80,8 +80,8 @@ app.get('/api/fatsecret/search-foods', async(req: Request, res: Response) => {
     const foods = Array.isArray(foodData) ? foodData : [foodData];
 
     const result = foods.map((food: any) => ({
-      id: food.food_id,
-      name: food.food_name
+      id: parseInt(food.food_id) || 0,
+      name: food.food_name || 'Unknown Food'
     }))
 
     res.json(result)
