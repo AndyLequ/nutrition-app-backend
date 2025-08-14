@@ -54,6 +54,10 @@ interface FatSecretFood {
   name: string;
 }
 
+interface FatSecretFoodById {
+  
+}
+
 interface FatSecretServing {
   protein: string;
   calories: string;

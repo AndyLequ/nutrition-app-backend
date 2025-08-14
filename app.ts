@@ -115,9 +115,16 @@ app.get('/api/fatsecret/food/:id', async(req: Request, res: Response) => {
       }
     })
 
-    const nutritionInfo = mapFoodToNutritionInfo(response.data)
-    res.json(nutritionInfo)
+    const foodData = response.data?.food;
+    if(!foodData) {
+      return res.status(404).json({error: "Food not found"})
+    }
 
+    const nutritionInfo = mapFoodToNutritionInfo(response.data)
+    res.json({
+      id: foodId,
+      name: foodData.food_name,
+      ...nutritionInfo})
 
   } catch(error: any){
     console.error('api error:', error.response?.data || error.message);
