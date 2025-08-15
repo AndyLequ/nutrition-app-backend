@@ -6,7 +6,8 @@ import {
     FatSecretFood,
     FatSecretServing,
     FatSecretRecipe,
-    FatSecretIngredient
+    FatSecretIngredient,
+    FatSecretSearchResponse
 } from './types'
 import axios from 'axios'
 import {getFatSecretToken} from './fatsecret';
@@ -75,7 +76,15 @@ app.get('/api/fatsecret/search-foods', async(req: Request, res: Response) => {
       }
     })
 
-    res.json(response.data)
+    const foodData = response.data.foods.food
+    const foods = Array.isArray(foodData) ? foodData : [foodData];
+
+    const result = foods.map((food: any) => ({
+      id: parseInt(food.food_id) || 0,
+      name: food.food_name || 'Unknown Food'
+    }))
+
+    res.json(result)
 
   } catch(error: any){
     console.error('API Error:', error.response?.data || error.message)
@@ -106,9 +115,16 @@ app.get('/api/fatsecret/food/:id', async(req: Request, res: Response) => {
       }
     })
 
-    const nutritionInfo = mapFoodToNutritionInfo(response.data)
-    res.json(nutritionInfo)
+    const foodData = response.data?.food;
+    if(!foodData) {
+      return res.status(404).json({error: "Food not found"})
+    }
 
+    const nutritionInfo = mapFoodToNutritionInfo(response.data)
+    res.json({
+      id: foodId,
+      name: foodData.food_name,
+      ...nutritionInfo})
 
   } catch(error: any){
     console.error('api error:', error.response?.data || error.message);
