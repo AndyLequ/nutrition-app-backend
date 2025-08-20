@@ -59,25 +59,34 @@ app.get('/api/fatsecret/search-foods', async(req: Request, res: Response) => {
     const token = await getFatSecretToken();
     
     const params = new URLSearchParams();
-    params.append('method', 'foods.search')
-    params.append('search_expression', query as string)
-    params.append('format', 'json')
-    params.append('max_results', String(maxResults ?? 'null'))
-    params.append('page_number', String(pageNumber ?? 'null'))
+    params.append('method', 'foods.search');
+    params.append('search_expression', query as string);
+    params.append('format', 'json');
+
+    if(maxResults) params.append('max_results', String(maxResults));
+    if(pageNumber) params.append('page_number', String(pageNumber));
+
     
-    
-    const response = await axios.post(
+    const response = await axios.get(
       'https://platform.fatsecret.com/rest/server.api',
-      params,
       {
+      params,
       headers: {
         'Authorization': `Bearer ${token}`,
-        'Accept': 'application/x-www-form-urlencoded'
+        'Accept': 'application/json'
       }
     })
 
-    const foodData = response.data.foods.food
-    const foods = Array.isArray(foodData) ? foodData : [foodData];
+    let foodData = response.data.foods?.food
+    
+    let foods = Array.isArray(foodData) ? foodData : [foodData];
+
+    if(!foodData) {
+      foodData = []
+    } else if (!Array.isArray(foodData)) {
+      foodData = [foodData];
+    }
+    
 
     const result = foods.map((food: any) => ({
       id: parseInt(food.food_id) || 0,
