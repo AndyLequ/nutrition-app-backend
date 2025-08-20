@@ -1,10 +1,3 @@
-interface Recipe {
-    id: number;
-    title: string;
-    image: string;
-    [key: string]: any; // Adjust based on actual API response
-}
-
 
 interface Ingredient {
     id: number;
@@ -39,11 +32,77 @@ interface RecipeSearchParams {
     sortDirection?: 'asc' | 'desc'
 }
 
+interface Recipe {
+  id: number;
+  title: string;
+  image: string;
+  [key: string]: any;
+}
+
+//FatSecret API types
+interface FatSecretSearchResponse {
+  foods: {
+    food: FatSecretFood | FatSecretFood[];
+    max_results: number;
+    page_number: number;
+    total_results: number;
+  }
+}
+
+interface FatSecretFood {
+  id: number;
+  name: string;
+}
+
+interface FatSecretFoodById {
+  
+}
+
+interface FatSecretServing {
+  protein: string;
+  calories: string;
+  carbohydrate: string;
+  fat: string;
+  metric_serving_amount: string;
+  metric_serving_unit: string;
+}
+
+interface FatSecretRecipe {
+  recipe_id: string;
+  recipe_name: string;
+  recipe_image?: string;
+  recipe_url?: string;
+  recipe_description?: string;
+  ingredients?: {
+    ingredient: FatSecretIngredient | FatSecretIngredient[];
+  }
+  recipe_nutrition?: {
+    protein: string;
+    calories: string;
+    carbohydrate: string;
+    fat: string;
+  }
+  number_of_servings?: string;
+}
+
+
+interface FatSecretIngredient {
+  food_id?: string;
+  ingredient_name: string;
+  ingredient_description: string;
+}
+
+
 export {
     Recipe,
     Ingredient,
     IngredientResponse,
     NutritionInfo,
     IngredientSearchParams,
-    RecipeSearchParams
+    RecipeSearchParams,
+    FatSecretSearchResponse,
+    FatSecretFood,
+    FatSecretServing,
+    FatSecretRecipe,
+    FatSecretIngredient
 }
