@@ -152,11 +152,14 @@ app.get("/api/fatsecret/food/:id", async (req: Request, res: Response) => {
       return res.status(404).json({ error: "Food not found" });
     }
 
-    const nutritionInfo = mapFoodToNutritionInfo(response.data);
+    const { servingNutrition, perGramNutrition } = mapFoodToNutritionInfo(
+      response.data
+    );
     res.json({
       id: foodId,
       name: foodData.food_name,
-      ...nutritionInfo,
+      serving: servingNutrition,
+      perGram: perGramNutrition,
     });
   } catch (error: any) {
     console.error("api error:", error.response?.data || error.message);
@@ -291,8 +294,8 @@ app.get("/api/fatsecret/recipe/:id", async (req: Request, res: Response) => {
 
 // this one here is for food items returned from fatsecret
 function mapFoodToNutritionInfo(apiData: any): {
-  servingNutrition: NutritionInfo;
-  perGramNutrition: NutritionInfo;
+  servingNutrition: fatsecretNutritionInfo;
+  perGramNutrition: fatsecretNutritionInfo;
 } {
   const food = apiData?.food || {};
   const servings = food?.servings?.serving || [];
@@ -327,7 +330,7 @@ function mapFoodToNutritionInfo(apiData: any): {
   };
 
   // calculating per gram values(if serving amount is valid)
-  let perGramNutrition: NutritionInfo;
+  let perGramNutrition: fatsecretNutritionInfo;
 
   // Extract and convert nutrition values, then divide by serving amount to get per gram
   if (servingAmount > 0 && preferredServing.metric_serving_unit === "g") {
