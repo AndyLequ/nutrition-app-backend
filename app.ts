@@ -170,6 +170,48 @@ app.get("/api/fatsecret/food/:id", async (req: Request, res: Response) => {
   }
 });
 
+// figuring out how to restructure this block to fit the needs of the app
+/* [
+   {
+     recipe_id: 106050235,
+     recipe_name: "Golden Flaxseed Bread",
+     recipe_nutrition: {
+       calories: 139,
+       protein: 6.49,
+       carbs: 13.36,
+       fat: 7.58,
+       amount: 1,
+       unit: "serving",
+     },
+     types: ["Baked", "Snack", "Breakfast"],
+   },
+   {
+     recipe_id: 105877893,
+     recipe_name: "Chocolate Banana Bread",
+     recipe_nutrition: {
+       calories: 127,
+       protein: 4.13,
+       carbs: 21.62,
+       fat: 3.86,
+       amount: 1,
+       unit: "serving",
+     },
+     types: ["Dessert", "Snack", "Baked", "Breakfast"],
+   },
+   {
+     recipe_id: 105815623,
+     recipe_name: "Cheesecake",
+     recipe_nutrition: {
+       calories: 453,
+       protein: 20.67,
+       carbs: 46.19,
+       fat: 21.11,
+       amount: 1,
+       unit: "serving",
+     },
+     types: ["Dessert", "Snack", "Baked", "Breakfast"],
+   },
+ ];  */
 // recipe search fatsecret
 app.get("/api/fatsecret/recipes", async (req: Request, res: Response) => {
   const { query, maxResults = 3, pageNumber = 0 } = req.query;
@@ -219,10 +261,23 @@ app.get("/api/fatsecret/recipes", async (req: Request, res: Response) => {
   }
 });
 
+/* 
+  the data structure that the fatsecret recipe by id endpoint returns
+{
+  "protein":16,
+  "calories":543,
+  "carbs":83,
+  "fat":16,
+  "amount":1,
+  "unit":"serving"
+} */
+// added logging to find what's wrong
 app.get("/api/fatsecret/recipe/:id", async (req: Request, res: Response) => {
   try {
     const recipeId = req.params.id;
     const token = await getFatSecretToken();
+    // log
+    console.log("token added successfully");
 
     const response = await axios.get(
       "https://platform.fatsecret.com/rest/recipe/v2",
@@ -239,19 +294,18 @@ app.get("/api/fatsecret/recipe/:id", async (req: Request, res: Response) => {
       }
     );
 
+    // log
+    console.log("FatSecret API response received");
+    console.log("Response data:", JSON.stringify(response.data, null, 2));
+
     // initializing recipe so that i can make my macronutrient per gram work below
     const recipe = response.data?.recipe;
     if (!recipe) {
       throw new Error("Recipe data not found in API response");
     }
 
-    /* Replacing the recipe /information endpoint here 
-        Calculate nutrients per gram:
-          *Find the number of servings
-          *Find the metric serving amount
-          *Find the nutrients per serving
-          *Find the total grams of the recipe
-      */
+    console.log("Recipe data found, processing nutrition info");
+
     const servings = parseInt(recipe.number_of_servings) || 1;
 
     // Fallback if total_weight_grams is missing
@@ -264,22 +318,16 @@ app.get("/api/fatsecret/recipe/:id", async (req: Request, res: Response) => {
     }
 
     /* Get nutrition data (replaces /nutrition)  */
-    const nutritionPerServing = mapRecipeToNutritionInfo(response.data);
+    const { perServing, perGram } = mapRecipeToNutritionInfo(response.data);
 
     // Combine the responses
-    const result = {
-      // from information endpoint
-      servings,
-      servingSizeGrams,
-      protein: nutritionPerServing.protein,
-      calories: nutritionPerServing.calories,
-      carbs: nutritionPerServing.carbs,
-      fat: nutritionPerServing.fat,
-      amount: 1,
-      unit: "serving",
-    };
 
-    res.json(result);
+    res.json({
+      id: recipeId,
+      name: recipe.recipe_name,
+      nutritionPerServing: perServing,
+      nutritionPerGram: perGram,
+    });
   } catch (error: any) {
     console.error("api error:", error.response?.data || error.message);
     res.status(500).json({
@@ -358,7 +406,10 @@ function mapFoodToNutritionInfo(apiData: any): {
 }
 
 // this one is to map returned recipe data to nutrition info
-function mapRecipeToNutritionInfo(apiData: any): NutritionInfo {
+function mapRecipeToNutritionInfo(apiData: any): {
+  perServing: NutritionInfo;
+  perGram: NutritionInfo;
+} {
   const recipe = apiData?.recipe;
 
   if (!recipe) {
@@ -374,23 +425,11 @@ function mapRecipeToNutritionInfo(apiData: any): NutritionInfo {
   // find any gram-based serving
   const gramServing = servings?.find((s: any) => s.metric_serving_unit === "g");
 
-  if (gramServing) {
-    // Extract and convert nutrition values
-    return {
-      protein: parseFloat(gramServing.protein) || 0,
-      calories: parseFloat(gramServing.calories) || 0,
-      carbs: parseFloat(gramServing.carbohydrate) || 0,
-      fat: parseFloat(gramServing.fat) || 0,
-      amount: parseFloat(gramServing.metric_serving_amount) || 0,
-      unit: "g",
-    };
-  }
-
   // fallback to first available serving
   const firstServing = servings?.[0];
   if (!firstServing) throw new Error("No serving data found");
 
-  return {
+  const perServing: NutritionInfo = {
     protein: parseFloat(firstServing.protein) || 0,
     calories: parseFloat(firstServing.calories) || 0,
     carbs: parseFloat(firstServing.carbohydrate) || 0,
@@ -398,6 +437,44 @@ function mapRecipeToNutritionInfo(apiData: any): NutritionInfo {
     amount: parseFloat(firstServing.metric_serving_amount) || 0,
     unit: firstServing.metric_serving_unit || "serving",
   };
+
+  let perGram: NutritionInfo;
+
+  if (gramServing) {
+    // Extract and convert nutrition values
+    const gramAmount = parseFloat(gramServing.metric_serving_amount) || 1;
+    perGram = {
+      protein: parseFloat(gramServing.protein) || 0,
+      calories: parseFloat(gramServing.calories) || 0,
+      carbs: parseFloat(gramServing.carbohydrate) || 0,
+      fat: parseFloat(gramServing.fat) || 0,
+      amount: 1,
+      unit: "g",
+    };
+  } else {
+    const servingAmount = parseFloat(firstServing.metric_serving_amount) || 0;
+    if (servingAmount > 0) {
+      perGram = {
+        protein: parseFloat(firstServing.protein) || 0,
+        calories: parseFloat(firstServing.calories) || 0,
+        carbs: parseFloat(firstServing.carbohydrate) || 0,
+        fat: parseFloat(firstServing.fat) || 0,
+        amount: parseFloat(firstServing.metric_serving_amount) || 0,
+        unit: firstServing.metric_serving_unit || "serving",
+      };
+    } else {
+      // fallback if we can't calculate per gram
+      perGram = {
+        protein: 0,
+        calories: 0,
+        carbs: 0,
+        fat: 0,
+        amount: 1,
+        unit: "g",
+      };
+    }
+  }
+  return { perServing, perGram };
 }
 
 //
