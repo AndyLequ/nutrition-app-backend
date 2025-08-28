@@ -98,7 +98,41 @@ interface FatSecretIngredient {
   ingredient_description: string;
 }
 
+//EXPERIMENT
+// Common interfaces for both foods and recipes
+interface BaseItem {
+  id: number;
+  name: string;
+  type: 'food' | 'recipe';
+}
+
+interface NutritionInfo {
+  calories: number;
+  protein: number;
+  carbs: number;
+  fat: number;
+  amount: number;
+  unit: string;
+}
+
+interface FoodItem extends BaseItem {
+  type: 'food';
+  // Additional food-specific properties can go here
+}
+
+interface RecipeItem extends BaseItem {
+  type: 'recipe';
+  nutrition: NutritionInfo;
+  categories: string[];
+  // Additional recipe-specific properties can go here
+}
+
+type UnifiedItem = FoodItem | RecipeItem;
+
 export {
+  BaseItem,
+  FoodItem,
+  RecipeItem,
   Recipe,
   Ingredient,
   IngredientResponse,

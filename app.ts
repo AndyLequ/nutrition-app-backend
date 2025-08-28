@@ -5,6 +5,7 @@ import express, {
   ErrorRequestHandler,
 } from "express";
 import {
+  FoodItem,
   Recipe,
   Ingredient,
   NutritionInfo,
@@ -98,9 +99,11 @@ app.get("/api/fatsecret/search-foods", async (req: Request, res: Response) => {
       foodData = [foodData];
     }
 
+    // change made to get data response to be same as recipe search
     const result = foods.map((food: any) => ({
       id: parseInt(food.food_id) || 0,
       name: food.food_name || "Unknown Food",
+      type: "food",
     }));
 
     res.json(result);
@@ -240,10 +243,12 @@ app.get("/api/fatsecret/recipes", async (req: Request, res: Response) => {
     const recipes = response.data.recipes.recipe;
 
     // deal with this later, need to figure out if I want to map the data here or just let it return only the results names
-    const mappedRecipes: FatSecretRecipe[] = recipes.map((recipe: any) => ({
-      recipe_id: Number(recipe.recipe_id),
-      recipe_name: recipe.recipe_name,
-      recipe_nutrition: {
+    const mappedRecipes = recipes.map((recipe: any) => ({
+      id: Number(recipe.recipe_id), // Changed from recipe_id to id
+      name: recipe.recipe_name, // Changed from recipe_name to name
+      type: "recipe", // Added type field
+      nutrition: {
+        // Changed from recipe_nutrition to nutrition
         calories: Number(recipe.recipe_nutrition?.calories),
         protein: Number(recipe.recipe_nutrition?.protein),
         carbs: Number(recipe.recipe_nutrition?.carbohydrate),
@@ -251,7 +256,7 @@ app.get("/api/fatsecret/recipes", async (req: Request, res: Response) => {
         amount: 1,
         unit: "serving",
       },
-      types: recipe.recipe_types?.recipe_type || [],
+      categories: recipe.recipe_types?.recipe_type || [], // Changed from types to categories
     }));
 
     res.json(mappedRecipes);
@@ -276,6 +281,7 @@ app.get("/api/fatsecret/recipe/:id", async (req: Request, res: Response) => {
   try {
     const recipeId = req.params.id;
     const token = await getFatSecretToken();
+
     // log
     console.log("token added successfully");
 
@@ -444,23 +450,24 @@ function mapRecipeToNutritionInfo(apiData: any): {
     // Extract and convert nutrition values
     const gramAmount = parseFloat(gramServing.metric_serving_amount) || 1;
     perGram = {
-      protein: parseFloat(gramServing.protein) || 0,
-      calories: parseFloat(gramServing.calories) || 0,
-      carbs: parseFloat(gramServing.carbohydrate) || 0,
-      fat: parseFloat(gramServing.fat) || 0,
+      protein: parseFloat(gramServing.protein) / gramAmount || 0,
+      calories: parseFloat(gramServing.calories) / gramAmount || 0,
+      carbs: parseFloat(gramServing.carbohydrate) / gramAmount || 0,
+      fat: parseFloat(gramServing.fat) / gramAmount || 0,
       amount: 1,
       unit: "g",
     };
   } else {
+    // calculate per gram values from the first serving
     const servingAmount = parseFloat(firstServing.metric_serving_amount) || 0;
-    if (servingAmount > 0) {
+    if (servingAmount > 0 && firstServing.metric_serving_unit === "g") {
       perGram = {
-        protein: parseFloat(firstServing.protein) || 0,
-        calories: parseFloat(firstServing.calories) || 0,
-        carbs: parseFloat(firstServing.carbohydrate) || 0,
-        fat: parseFloat(firstServing.fat) || 0,
-        amount: parseFloat(firstServing.metric_serving_amount) || 0,
-        unit: firstServing.metric_serving_unit || "serving",
+        protein: parseFloat(firstServing.protein) / servingAmount || 0,
+        calories: parseFloat(firstServing.calories) / servingAmount || 0,
+        carbs: parseFloat(firstServing.carbohydrate) / servingAmount || 0,
+        fat: parseFloat(firstServing.fat) / servingAmount || 0,
+        amount: 1,
+        unit: "g",
       };
     } else {
       // fallback if we can't calculate per gram
