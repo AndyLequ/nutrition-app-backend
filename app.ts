@@ -331,6 +331,7 @@ app.get("/api/fatsecret/recipe/:id", async (req: Request, res: Response) => {
     res.json({
       id: recipeId,
       name: recipe.recipe_name,
+      servingSizeGrams,
       nutritionPerServing: perServing,
       nutritionPerGram: perGram,
     });
