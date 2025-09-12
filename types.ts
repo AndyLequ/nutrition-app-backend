@@ -127,6 +127,22 @@ interface RecipeItem extends BaseItem {
   // Additional recipe-specific properties can go here
 }
 
+export interface FatSecretFoodDetails{
+  id: string;
+  name: string;
+  serving: fatsecretNutritionInfo;
+  perGram: fatsecretNutritionInfo;
+  servingSizeGrams?: number;
+}
+
+export interface FatSecretRecipeDetails {
+  id: string;
+  name: string;
+  servingSizeGrams: number;
+  nutritionPerServing: NutritionInfo;
+  nutritionPerGram: NutritionInfo;
+}
+
 type UnifiedItem = FoodItem | RecipeItem;
 
 export {
