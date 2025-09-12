@@ -164,6 +164,7 @@ app.get("/api/fatsecret/food/:id", async (req: Request, res: Response) => {
       serving: servingNutrition,
       perGram: perGramNutrition,
     });
+    
   } catch (error: any) {
     console.error("api error:", error.response?.data || error.message);
     res.status(500).json({
