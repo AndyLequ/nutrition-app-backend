@@ -89,7 +89,26 @@ app.get("/api/fatsecret/search-foods", async (req: Request, res: Response) => {
       }
     );
 
+    // debug logging
+    console.log(
+      "fatsecret API response:",
+      JSON.stringify(response.data, null, 2)
+    );
+    console.log("response structure", {
+      hasFoods: !!response.data.foods,
+      foodsType: typeof response.data.foods,
+      foodsValue: response.data.foods,
+    });
+
     let foodData = response.data.foods?.food;
+
+    if (!foodData) {
+      console.log(
+        "No food data found in response. Full response:",
+        response.data
+      );
+      return res.json([]); //return empty array instead of error
+    }
 
     let foods = Array.isArray(foodData) ? foodData : [foodData];
 
@@ -164,7 +183,6 @@ app.get("/api/fatsecret/food/:id", async (req: Request, res: Response) => {
       serving: servingNutrition,
       perGram: perGramNutrition,
     });
-    
   } catch (error: any) {
     console.error("api error:", error.response?.data || error.message);
     res.status(500).json({
