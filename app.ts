@@ -102,6 +102,14 @@ app.get("/api/fatsecret/search-foods", async (req: Request, res: Response) => {
 
     let foodData = response.data.foods?.food;
 
+    if (!foodData) {
+      console.log(
+        "No food data found in response. Full response:",
+        response.data
+      );
+      return res.json([]); //return empty array instead of error
+    }
+
     let foods = Array.isArray(foodData) ? foodData : [foodData];
 
     if (!foodData) {
