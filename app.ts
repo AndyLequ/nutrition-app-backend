@@ -119,15 +119,37 @@ app.get("/api/fatsecret/search-foods", async (req: Request, res: Response) => {
     }
 
     // change made to get data response to be same as recipe search
-    const result = foods.map((food: any) => ({
-      id: parseInt(food.food_id) || 0,
-      name: food.food_name || "Unknown Food",
-      type: "food",
-    }));
+    // const result = foods.map((food: any) => ({
+    //   id: parseInt(food.food_id) || 0,
+    //   name: food.food_name || "Unknown Food",
+    //   type: "food",
+    // }));
 
+    // safer mapping
+    const result = foods
+      .map((food: any) => {
+        // check if food object exists and has required properties
+        if (!food || !food.food_id) {
+          console.log("Invalid food object:", food);
+          return null;
+        }
+
+        return {
+          id: parseInt(food.food_id) || 0,
+          name: food.food_name || "Unknown Food",
+          type: "ingredient",
+        };
+      })
+      .filter(Boolean);
+
+    console.log("Mapped results:", result);
     res.json(result);
   } catch (error: any) {
-    console.error("API Error:", error.response?.data || error.message);
+    console.error("API Error:", {
+      message: error.message,
+      response: error.response?.data,
+      status: error.response?.status,
+    });
 
     res.status(500).json({
       error: "Failed to fetch food data from fatsecret",
