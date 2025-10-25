@@ -119,11 +119,22 @@ app.get("/api/fatsecret/search-foods", async (req: Request, res: Response) => {
     }
 
     // change made to get data response to be same as recipe search
-    const result = foods.map((food: any) => ({
-      id: parseInt(food.food_id) || 0,
-      name: food.food_name || "Unknown Food",
-      type: "food",
-    }));
+    // const result = foods.map((food: any) => ({
+    //   id: parseInt(food.food_id) || 0,
+    //   name: food.food_name || "Unknown Food",
+    //   type: "food",
+    // }));
+
+    // safer mapping
+    const result = foods.map((food: any) => {
+      // check if food object exists and has required properties
+      if (!food || !food.food_id) {
+        console.log("Invalid food object:", food);
+        return null;
+      }
+
+      return null;
+    });
 
     res.json(result);
   } catch (error: any) {
