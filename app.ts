@@ -145,7 +145,11 @@ app.get("/api/fatsecret/search-foods", async (req: Request, res: Response) => {
     console.log("Mapped results:", result);
     res.json(result);
   } catch (error: any) {
-    console.error("API Error:", error.response?.data || error.message);
+    console.error("API Error:", {
+      message: error.message,
+      response: error.response?.data,
+      status: error.response?.status,
+    });
 
     res.status(500).json({
       error: "Failed to fetch food data from fatsecret",
